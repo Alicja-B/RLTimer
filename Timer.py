@@ -9,6 +9,8 @@ class Window(object):
         self.isRunning = False
         self.timer_green = True
         self.timer_time = "00:00"
+        self.description = {}
+        self.sessioninfo = []
 
         lTimer = Label(window, text="Timer", font=('times', 20, 'bold'), fg='blue')
         lTimer.grid(row=0, column=0, rowspan=2)
@@ -19,17 +21,17 @@ class Window(object):
         bstart=Button(window, text="Start", command=self.start)
         bstart.grid(row=0, column=2)
 
-        bstop=Button(window, text="Stop", command=self.stop)
+        bstop=Button(window, text="Pause", command=self.stop)
         bstop.grid(row=1, column=2)
 
         bsubmit=Button(window, text="Submit", command=self.submit)
         bsubmit.grid(row=0, column=3)
 
-        bclear=Button(window, text="Clear", command=self.clear)
+        bclear=Button(window, text="Submit & Stop", command=self.stop)
         bclear.grid(row=1, column=3)
 
         self.task_type = StringVar(window)
-        type_choices = {'EXP', 'SxS', 'EXP PQ', 'Local', 'GSA'}
+        type_choices = {'EXP', 'SxS', 'EXP PQ', 'Local', 'GSA', 'Image'}
         self.task_type.set('EXP')
         task_typeMenu = OptionMenu(window, self.task_type, *type_choices)
         Label(window, text="Choose Task Type").grid(row=2, column=0)
@@ -37,9 +39,10 @@ class Window(object):
         self.task_type.trace('w', self.change_tasktype)
 
         self.task_duration = StringVar(window)
-        time_choices = {'01:00', '01:18', '04:48', '06:48', '07:00'}
+        time_choices = {'01:00', '01:18', '01:30', '02:00', '03:00', '03:36', '04:00',
+             '04:48', '05:00', '06:00', '06:48', '07:00', '08:18', '09:00'}
         self.task_duration.set('01:00')
-        task_timeMenu = OptionMenu(window, self.task_duration, *time_choices)
+        task_timeMenu = OptionMenu(window, self.task_duration, *sorted(time_choices) )
         Label(window, text="Choose Task AET").grid(row=2, column=2)
         task_timeMenu.grid(row=2, column=3)
         self.task_duration.trace('w', self.change_taskduration)
@@ -54,8 +57,8 @@ class Window(object):
         lduration = Label(window, text="Duration")
         lduration.grid(row=3, column=2)
 
-        tduration = Text(window, height=1, width=10)
-        tduration.grid(row=3, column=3)
+        self.tduration = Label(window, height=1, width=10)
+        self.tduration.grid(row=3, column=3)
 
         lsurplus=Label(window, text="Surplus")
         lsurplus.grid(row=4, column=0)
@@ -72,17 +75,17 @@ class Window(object):
         ldescription = Label(window, text="Description")
         ldescription.grid(row=5, column=0)
 
-        tdescription = Text(window, height=1, width=20)
-        tdescription.grid(row=5, column=1)
+        self.tdescription = Text(window, height=1, width=20)
+        self.tdescription.grid(row=5, column=1)
 
-        sessioninfo = Listbox(window, height=10, width=42)
-        sessioninfo.grid(row=6, column=0, rowspan=10, columnspan=2)
+        self.sessioninfo = Listbox(window, height=10, width=42)
+        self.sessioninfo.grid(row=6, column=0, rowspan=10, columnspan=2)
 
         sb = Scrollbar(window)
         sb.grid(row=6, column=2, rowspan=10)
 
-        sessioninfo.configure(yscrollcommand=sb.set)
-        sb.configure(command=sessioninfo.yview)
+        self.sessioninfo.configure(yscrollcommand=sb.set)
+        sb.configure(command=self.sessioninfo.yview)
 
         btoday=Button(window, text="Today", command=self.start)
         btoday.grid(row=6, column=3)
@@ -112,15 +115,14 @@ class Window(object):
         self.timer_run = False
 
     def submit(self):
-        self.timer_run = False
-        update_description()
-        update_db()
-        update_surplus()
+        #taskchooser = Toplevel()
+        #description = Label(taskchooser, text="Continue with the same AET?")
+        #description.pack()
 
-    def clear(self):
-        self.timer_run = False
-        self.timer_time = '00:00'
-        self.tTimer.config(text=self.timer_time)
+        self.start_time = datetime.now()
+        self.update_description()
+        self.update_db()
+        self.update_surplus()
 
     def timer(self):
         if  self.timer_run:
@@ -131,6 +133,8 @@ class Window(object):
             time1 = timedelta(seconds=task_time.minute*60 + task_time.second)
             if ( delta.total_seconds() >= timedelta(seconds=task_time.minute*60 + task_time.second).total_seconds() ):
                 self.timer_green = False
+            else:
+                self.timer_green = True
             if self.timer_green:
                 time1 = time1 - delta
                 time2 = str(time1)[:-7]
@@ -144,17 +148,40 @@ class Window(object):
                 self.tTimer.config(text=self.timer_time)
         self.tTimer.after(50, self.timer)
 
-    def start_session(self):
-        self.tsessionstart.insert(END, self.start_time)
+    def duration_timer(self):
+        time1 = '00:00'
+        if self.timer_run:
+            next_time = datetime.now()
+            delta = next_time - self.session_start
+            time1 = str(delta)[:7]
+        if time1 != self.session_duration:
+            self.session_duration = time1
+            self.tduration.config(text=self.session_duration)
+        self.tduration.after(50, self.duration_timer)
 
-    def update_surplus():
+    def start_session(self):
+        self.tsessionstart.insert(END, self.start_time.strftime("%Y-%m-%d %H:%M"))
+        self.session_start = self.start_time
+        self.session_duration = '00:00'
+        self.tduration.config(text=self.session_duration)
+        self.duration_timer()
+
+    def update_surplus(self):
         print("surplus updated")
 
-    def update_db():
+    def update_db(self):
         print("db updated")
 
-    def update_description():
-        print("description updated")
+    def update_description(self):
+        task_name = self.task_type.get() + " " + self.task_duration.get()
+        if task_name in self.description:
+            self.description[task_name]+=1
+        else:
+            self.description[task_name] = 1
+        print(self.description)
+        self.sessioninfo.delete(0,END)
+        for key, value in self.description.items():
+            self.sessioninfo.insert(END, key+" "+str(value))
 
     def change_tasktype(self, *args):
         print(self.task_type.get())
