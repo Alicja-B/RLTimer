@@ -11,7 +11,7 @@ class Window(object):
         self.timer_time = "00:00"
         self.description = {}
         self.sessioninfo = []
-
+        self.surplus = 0
         lTimer = Label(window, text="Timer", font=('times', 20, 'bold'), fg='blue')
         lTimer.grid(row=0, column=0, rowspan=2)
 
@@ -39,8 +39,8 @@ class Window(object):
         self.task_type.trace('w', self.change_tasktype)
 
         self.task_duration = StringVar(window)
-        time_choices = {'01:00', '01:18', '01:30', '02:00', '03:00', '03:36', '04:00',
-             '04:48', '05:00', '06:00', '06:48', '07:00', '08:18', '09:00'}
+        time_choices = {'01:00', '01:18', '01:30', '02:00', '03:00', '03:36', '03:48', '04:00',
+             '04:48', '05:00', '06:00', '06:48', '07:00', '08:00', '08:18', '09:00', '10:00', '11:00', '12:00'}
         self.task_duration.set('01:00')
         task_timeMenu = OptionMenu(window, self.task_duration, *sorted(time_choices) )
         Label(window, text="Choose Task AET").grid(row=2, column=2)
@@ -51,7 +51,7 @@ class Window(object):
         lsessionstart = Label(window, text="Session Start")
         lsessionstart.grid(row=3, column=0)
 
-        self.tsessionstart = Text(window, height=1, width=20)
+        self.tsessionstart = Label(window, text="")
         self.tsessionstart.grid(row=3, column=1)
 
         lduration = Label(window, text="Duration")
@@ -63,8 +63,8 @@ class Window(object):
         lsurplus=Label(window, text="Surplus")
         lsurplus.grid(row=4, column=0)
 
-        tsurplus = Text(window, height=1, width=10)
-        tsurplus.grid(row=4, column=1)
+        self.tsurplus = Label(window, text="00:00")
+        self.tsurplus.grid(row=4, column=1)
 
         learnings = Label(window, text="Earnings")
         learnings.grid(row=4, column=2)
@@ -118,11 +118,13 @@ class Window(object):
         #taskchooser = Toplevel()
         #description = Label(taskchooser, text="Continue with the same AET?")
         #description.pack()
-
+        self.update_surplus()
+        self.save_tofile()
         self.start_time = datetime.now()
         self.update_description()
         self.update_db()
-        self.update_surplus()
+
+
 
     def timer(self):
         if  self.timer_run:
@@ -160,10 +162,12 @@ class Window(object):
         self.tduration.after(50, self.duration_timer)
 
     def start_session(self):
-        self.tsessionstart.insert(END, self.start_time.strftime("%Y-%m-%d %H:%M"))
+
+        self.tsessionstart.config( text=self.start_time.strftime("%Y-%m-%d %H:%M") )
         self.session_start = self.start_time
         self.session_duration = '00:00'
-        self.tduration.config(text=self.session_duration)
+        self.tduration.config( text=self.session_duration )
+        self.tsurplus.config(text = self.surplus)
         self.duration_timer()
 
     def update_surplus(self):
@@ -189,6 +193,15 @@ class Window(object):
     def change_taskduration(self, *args):
         print(self.task_duration.get())
 
+    def save_tofile(self):
+        time = datetime.now().strftime("%H:%M:%S")
+        file_name = datetime.now().strftime("%Y-%m-%d")
+        backupfile = open(file_name + ".csv", "a")
+        tuple = (self.start_time.strftime("%H:%M:%S") + ", " +  time + ", " +
+         self.task_type.get() + ", " + self.task_duration.get() + ", " + self.timer_time  )
+        tuple = tuple + ", " + self.session_duration
+        backupfile.write(tuple + "\n")
+        backupfile.close()
 
 window=Tk()
 Window(window)
