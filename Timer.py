@@ -1,13 +1,15 @@
 from tkinter import *
 from datetime import *
+from time import *
+from backend import Database
 
+database = Database("sessions.db")
 class Window(object):
 
     def __init__(self, window):
         self.window = window
         self.window.title("Raterlabs Timer")
         self.isRunning = False
-        self.timer_green = True
         self.timer_time = "00:00"
         self.description = {}
         self.sessioninfo = []
@@ -31,22 +33,31 @@ class Window(object):
         bclear.grid(row=1, column=3)
 
         self.task_type = StringVar(window)
-        type_choices = {'EXP', 'SxS', 'EXP PQ', 'Local', 'GSA', 'Image'}
+        type_choices = {'EXP', 'SxS', 'EXP PQ', 'Local', 'GSA', 'Image', 'YouTube'}
         self.task_type.set('EXP')
         task_typeMenu = OptionMenu(window, self.task_type, *type_choices)
-        Label(window, text="Choose Task Type").grid(row=2, column=0)
+        Label(window, text="Task Type").grid(row=2, column=0)
         task_typeMenu.grid(row=2, column=1)
         self.task_type.trace('w', self.change_tasktype)
 
-        self.task_duration = StringVar(window)
-        time_choices = {'01:00', '01:18', '01:30', '02:00', '03:00', '03:36', '03:48', '04:00',
-             '04:48', '05:00', '06:00', '06:48', '07:00', '08:00', '08:18', '09:00', '10:00', '11:00', '12:00'}
-        self.task_duration.set('01:00')
-        task_timeMenu = OptionMenu(window, self.task_duration, *sorted(time_choices) )
-        Label(window, text="Choose Task AET").grid(row=2, column=2)
+        self.task_minutes = StringVar(window)
+        self.task_seconds = StringVar(window)
+        time_choices = {'00', '01', '02', '03', '04', '05', '06', '07', '08', '09',
+             '10', '11', '12', '13', '14', '15'}
+        sec_choices = {'00', '06', '12', '18', '24', '30', '36', '42', '48', '54'}
+        self.task_minutes.set("01")
+        self.task_seconds.set("00")
+        task_timeMenu = OptionMenu(window, self.task_minutes, *sorted(time_choices) )
+        task_secMenu = OptionMenu(window, self.task_seconds, *sorted(sec_choices) )
+        Label(window, text="Task AET").grid(row=2, column=2)
         task_timeMenu.grid(row=2, column=3)
-        self.task_duration.trace('w', self.change_taskduration)
-        self.timer_time = self.task_duration.get()
+        Label(window, text = "min").grid(row=2, column=4)
+        task_secMenu.grid(row=2, column=5)
+        Label(window, text = "sec").grid(row=2, column=6)
+        self.task_minutes.trace('w', self.change_taskduration)
+        self.task_seconds.trace('w', self.change_taskduration)
+        self.task_duration = self.task_minutes.get() + ":" + self.task_seconds.get()
+        self.timer_time = self.task_duration
 
         lsessionstart = Label(window, text="Session Start")
         lsessionstart.grid(row=3, column=0)
@@ -75,7 +86,7 @@ class Window(object):
         ldescription = Label(window, text="Description")
         ldescription.grid(row=5, column=0)
 
-        self.tdescription = Text(window, height=1, width=20)
+        self.tdescription = Label(window, text="")
         self.tdescription.grid(row=5, column=1)
 
         self.sessioninfo = Listbox(window, height=10, width=42)
@@ -104,14 +115,17 @@ class Window(object):
 
     def start(self):
         self.timer_run = True
-        self.timer_time = self.task_duration.get()
+        self.timer_time = self.task_duration
         self.start_time = datetime.now()
         self.current_time = self.start_time
-        self.timer_green = True
+        self.surplus_time = self.timer_time
+        self.surplus = 0
         self.timer()
         self.start_session()
 
     def stop(self):
+        database.insert(self.start_time.strftime("%Y-%m-%d %H:%M:%S") , self.current_time.strftime("%Y-%m-%d %H:%M:%S"),
+            self.description_text, self.session_duration)
         self.timer_run = False
 
     def submit(self):
@@ -119,7 +133,8 @@ class Window(object):
         #description = Label(taskchooser, text="Continue with the same AET?")
         #description.pack()
         self.update_surplus()
-        self.save_tofile()
+        self.current_time = datetime.now()
+        #self.save_tofile()
         self.start_time = datetime.now()
         self.update_description()
         self.update_db()
@@ -130,21 +145,33 @@ class Window(object):
         if  self.timer_run:
             time2 = self.timer_time
             next_time = datetime.now()
+
             delta = next_time - self.start_time
-            task_time = datetime.strptime(self.task_duration.get(), "%M:%S")
-            time1 = timedelta(seconds=task_time.minute*60 + task_time.second)
+            task_time = datetime.strptime(self.task_duration, "%M:%S")
+            task_sec = task_time.minute*60 + task_time.second
+            time1 = timedelta(seconds=task_sec)
+            surplus_delta = self.surplus - delta.total_seconds() + task_sec
+            new_surplus = str( timedelta( seconds=abs(surplus_delta) ) )[:-7]
+            if (surplus_delta < 0):
+                new_surplus = "-" + new_surplus
+            if  new_surplus != self.surplus_time:
+                if surplus_delta < 0:
+                    self.tsurplus.config(fg='red')
+                else:
+                    self.tsurplus.config(fg='green')
+                self.surplus_time = new_surplus
+                self.tsurplus.config(text=self.surplus_time)
+
+
             if ( delta.total_seconds() >= timedelta(seconds=task_time.minute*60 + task_time.second).total_seconds() ):
-                self.timer_green = False
-            else:
-                self.timer_green = True
-            if self.timer_green:
-                time1 = time1 - delta
-                time2 = str(time1)[:-7]
-                self.tTimer.config(fg='green')
-            else:
                 time1 = delta - time1
                 time2 = '-' + str(time1)[:-7]
                 self.tTimer.config(fg='red')
+            else:
+                time1 = time1 - delta
+                time2 = str(time1)[:-7]
+                self.tTimer.config(fg='green')
+
             if time2 != self.timer_time:
                 self.timer_time = time2
                 self.tTimer.config(text=self.timer_time)
@@ -163,7 +190,7 @@ class Window(object):
 
     def start_session(self):
 
-        self.tsessionstart.config( text=self.start_time.strftime("%Y-%m-%d %H:%M") )
+        self.tsessionstart.config( text=self.start_time.strftime("%Y-%m-%d %H:%M:%S") )
         self.session_start = self.start_time
         self.session_duration = '00:00'
         self.tduration.config( text=self.session_duration )
@@ -171,17 +198,24 @@ class Window(object):
         self.duration_timer()
 
     def update_surplus(self):
-        print("surplus updated")
+        surplus_time = datetime.strptime(self.timer_time[-5:], "%M:%S")
+        surplus_sec = surplus_time.minute*60 + surplus_time.second
+        self.surplus += surplus_sec
+        print( "surplus updated " + str(self.surplus) )
 
     def update_db(self):
         print("db updated")
 
     def update_description(self):
-        task_name = self.task_type.get() + " " + self.task_duration.get()
+        task_name = self.task_type.get() + " " + self.task_duration
         if task_name in self.description:
             self.description[task_name]+=1
         else:
             self.description[task_name] = 1
+        self.description_text = ""
+        for key, value in self.description.items():
+            self.description_text += str(value) + " " + key + ", "
+        self.tdescription.config(text = self.description_text)
         print(self.description)
         self.sessioninfo.delete(0,END)
         for key, value in self.description.items():
@@ -191,14 +225,15 @@ class Window(object):
         print(self.task_type.get())
 
     def change_taskduration(self, *args):
-        print(self.task_duration.get())
+        self.task_duration = self.task_minutes.get() + ":" + self.task_seconds.get()
+        #print(self.task_duration)
 
     def save_tofile(self):
         time = datetime.now().strftime("%H:%M:%S")
         file_name = datetime.now().strftime("%Y-%m-%d")
         backupfile = open(file_name + ".csv", "a")
         tuple = (self.start_time.strftime("%H:%M:%S") + ", " +  time + ", " +
-         self.task_type.get() + ", " + self.task_duration.get() + ", " + self.timer_time  )
+         self.task_type.get() + ", " + self.task_duration + ", " + self.surplus_time  )
         tuple = tuple + ", " + self.session_duration
         backupfile.write(tuple + "\n")
         backupfile.close()
