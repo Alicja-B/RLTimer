@@ -11,7 +11,9 @@ class Window(object):
         self.window.title("Raterlabs Timer")
         self.isRunning = False
         self.timer_time = "00:00"
+        self.session_duration = "00:00"
         self.description = {}
+        self.description_text = ""
         self.sessioninfo = []
         self.surplus = 0
         lTimer = Label(window, text="Timer", font=('times', 20, 'bold'), fg='blue')
@@ -23,13 +25,13 @@ class Window(object):
         bstart=Button(window, text="Start", command=self.start)
         bstart.grid(row=0, column=2)
 
-        bstop=Button(window, text="Pause", command=self.stop)
+        bstop=Button(window, text="Stop", command=self.stop)
         bstop.grid(row=1, column=2)
 
         bsubmit=Button(window, text="Submit", command=self.submit)
         bsubmit.grid(row=0, column=3)
 
-        bclear=Button(window, text="Submit & Stop", command=self.stop)
+        bclear=Button(window, text="Submit & Stop", command=self.submit_stop)
         bclear.grid(row=1, column=3)
 
         self.task_type = StringVar(window)
@@ -68,7 +70,7 @@ class Window(object):
         lduration = Label(window, text="Duration")
         lduration.grid(row=3, column=2)
 
-        self.tduration = Label(window, height=1, width=10)
+        self.tduration = Label(window, text=self.session_duration)
         self.tduration.grid(row=3, column=3)
 
         lsurplus=Label(window, text="Surplus")
@@ -98,16 +100,16 @@ class Window(object):
         self.sessioninfo.configure(yscrollcommand=sb.set)
         sb.configure(command=self.sessioninfo.yview)
 
-        btoday=Button(window, text="Today", command=self.start)
+        btoday=Button(window, text="Today", command=self.today)
         btoday.grid(row=6, column=3)
 
-        bweek=Button(window, text="Week", command=self.start)
+        bweek=Button(window, text="Week", command=self.week)
         bweek.grid(row=7, column=3)
 
-        bperiod=Button(window, text="Period", command=self.start)
+        bperiod=Button(window, text="Period", command=self.period)
         bperiod.grid(row=8, column=3)
 
-        bmonth=Button(window, text="Month", command=self.start)
+        bmonth=Button(window, text="Month", command=self.month)
         bmonth.grid(row=9, column=3)
 
         bclose=Button(window, text="Close", command=self.start)
@@ -124,28 +126,28 @@ class Window(object):
         self.start_session()
 
     def stop(self):
-        database.insert(self.start_time.strftime("%Y-%m-%d %H:%M:%S") , self.current_time.strftime("%Y-%m-%d %H:%M:%S"),
-            self.description_text, self.session_duration)
+        self.update_db()
         self.timer_run = False
 
     def submit(self):
-        #taskchooser = Toplevel()
-        #description = Label(taskchooser, text="Continue with the same AET?")
-        #description.pack()
         self.update_surplus()
         self.current_time = datetime.now()
-        #self.save_tofile()
+        self.save_tofile()
         self.start_time = datetime.now()
         self.update_description()
+
+    def submit_stop(self):
+        self.update_surplus()
+        self.current_time = datetime.now()
+        self.save_tofile()
+        self.update_description()
         self.update_db()
-
-
+        self.timer_run = False
 
     def timer(self):
         if  self.timer_run:
             time2 = self.timer_time
             next_time = datetime.now()
-
             delta = next_time - self.start_time
             task_time = datetime.strptime(self.task_duration, "%M:%S")
             task_sec = task_time.minute*60 + task_time.second
@@ -161,7 +163,6 @@ class Window(object):
                     self.tsurplus.config(fg='green')
                 self.surplus_time = new_surplus
                 self.tsurplus.config(text=self.surplus_time)
-
 
             if ( delta.total_seconds() >= timedelta(seconds=task_time.minute*60 + task_time.second).total_seconds() ):
                 time1 = delta - time1
@@ -200,11 +201,17 @@ class Window(object):
     def update_surplus(self):
         surplus_time = datetime.strptime(self.timer_time[-5:], "%M:%S")
         surplus_sec = surplus_time.minute*60 + surplus_time.second
-        self.surplus += surplus_sec
+        if self.timer_time[0] == "-":
+            self.surplus -= surplus_sec
+        else:
+            self.surplus += surplus_sec
         print( "surplus updated " + str(self.surplus) )
 
     def update_db(self):
-        print("db updated")
+        if self.description_text != "":
+            database.insert(self.session_start.strftime("%Y-%m-%d %H:%M:%S") , self.current_time.strftime("%Y-%m-%d %H:%M:%S"),
+                self.description_text, self.session_duration, str( timedelta(seconds=self.surplus) ) )
+            print("db updated")
 
     def update_description(self):
         task_name = self.task_type.get() + " " + self.task_duration
@@ -237,6 +244,64 @@ class Window(object):
         tuple = tuple + ", " + self.session_duration
         backupfile.write(tuple + "\n")
         backupfile.close()
+
+    def week(self):
+        week_start = datetime.now() - timedelta( days=( datetime.isoweekday( datetime.now() ) % 7 ) )
+        rows = database.view_since(week_start.strftime("%Y-%m-%d") + " 00:00:00")
+        total = timedelta(seconds=0)
+        self.sessioninfo.delete(0,END)
+        for item in rows:
+            row = item[1] + " " + item[2][-8:] + " " + item[4]
+            duration =  datetime.strptime(item[4], "%H:%M:%S")
+            total = total + timedelta(hours=duration.hour, minutes=duration.minute, seconds=duration.second)
+            self.sessioninfo.insert(END, row)
+        print( "total: " + str(total) )
+
+    def today(self):
+        today = datetime.now().strftime("%Y-%m-%d") + " 00:00:00"
+        rows = database.view_since(today)
+        self.sessioninfo.delete(0,END)
+        total = timedelta(seconds=0)
+        total_surplus = 0
+        for item in rows:
+            row = item[1] + " " + item[2][-8:] + " " + item[4]
+            duration =  datetime.strptime(item[4], "%H:%M:%S")
+            total_surplus += item[5]
+            total = total + timedelta(hours=duration.hour, minutes=duration.minute, seconds=duration.second)
+            self.sessioninfo.insert(END, row)
+        self.sessioninfo.insert(END, "total: " + str(total))
+        surplus_str = str( timedelta( seconds=abs(total_surplus) ) )
+        if total_surplus < 0:
+            surplus_str = "-" + surplus_str
+        print ( surplus_str )
+
+    def month(self):
+        month = datetime.now().strftime("%Y-%m") + "-01 00:00:00"
+        rows = database.view_since(month)
+        self.sessioninfo.delete(0,END)
+        total = timedelta(seconds=0)
+        for item in rows:
+            row = item[1] + " " + item[2][-8:] + " " + item[4]
+            duration =  datetime.strptime(item[4], "%H:%M:%S")
+            total = total + timedelta(hours=duration.hour, minutes=duration.minute, seconds=duration.second)
+            self.sessioninfo.insert(END, row)
+        print( "total: " + str(total) )
+
+    def period(self):
+        today = datetime.now()
+        period_start=datetime.strptime("2018-04-01", "%Y-%m-%d")
+        total = timedelta(seconds=0)
+        while period_start <= today <= period_start + timedelta(days=14):
+            period_start = period_start + timedelta(days=14)
+        rows = database.view_since(period_start)
+        self.sessioninfo.delete(0,END)
+        for item in rows:
+            row = item[1] + " " + item[2][-8:] + " " + item[4]
+            duration =  datetime.strptime(item[4], "%H:%M:%S")
+            total = total + timedelta(hours=duration.hour, minutes=duration.minute, seconds=duration.second)
+            self.sessioninfo.insert(END, row)
+        print( "total: " + str(total) )
+
 
 window=Tk()
 Window(window)
