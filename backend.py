@@ -26,8 +26,8 @@ class Database:
         self.cur.execute("DELETE FROM sessions WHERE id=?",(id,))
         self.conn.commit()
 
-    def update(self, start_date, end_date, description, duration, surplus):
-        self.cur.execute("UPDATE book SET start_date=?, end_date=?, description=?, duration=? WHERE id=?",(start_date, end_date, description, duration, surplus))
+    def update(self, id, start_date, end_date, description, duration, surplus):
+        self.cur.execute("UPDATE sessions SET start_date=?, end_date=?, description=?, duration=?, surplus=? WHERE id=?",(start_date, end_date, description, duration, surplus, id))
         self.conn.commit()
 
     def __del__(self):
@@ -37,4 +37,4 @@ class Database:
 #database.delete(4)
 #database.insert("2018-04-22 08:12:53", "2018-04-22 08:18:34", "1 EXP 6:00", "0:05:41", 18)
 #database.insert("2018-04-22 11:02:48", "2018-04-22 11:34:48", "3 EXP 6:18, 2 EXP 01:00, 3 local 03:48, 1 EXP 01:18", "0:32:00", 90)
-#database.insert("2018-04-22 11:58:55", "2018-04-22 12:15:59", "1 EXP 6:18, 6 SxS 02:00", "0:17:03", 70)
+#database.update(4, "2018-04-22 20:57:41", "2018-04-22 21:19:35", "3 Local 04:30, 2 Local 03:00, 1 Local 04:00", "0:21:53", 93)

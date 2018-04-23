@@ -210,7 +210,7 @@ class Window(object):
     def update_db(self):
         if self.description_text != "":
             database.insert(self.session_start.strftime("%Y-%m-%d %H:%M:%S") , self.current_time.strftime("%Y-%m-%d %H:%M:%S"),
-                self.description_text, self.session_duration, str( timedelta(seconds=self.surplus) ) )
+                self.description_text, self.session_duration, self.surplus )
             print("db updated")
 
     def update_description(self):
@@ -251,7 +251,7 @@ class Window(object):
         total = timedelta(seconds=0)
         self.sessioninfo.delete(0,END)
         for item in rows:
-            row = item[1] + " " + item[2][-8:] + " " + item[4]
+            row = str(item[0]) + " " + item[1] + " " + item[2][-8:] + " " + item[4] + " " + str(item[5])
             duration =  datetime.strptime(item[4], "%H:%M:%S")
             total = total + timedelta(hours=duration.hour, minutes=duration.minute, seconds=duration.second)
             self.sessioninfo.insert(END, row)
