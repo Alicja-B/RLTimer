@@ -35,7 +35,7 @@ class Window(object):
         bclear.grid(row=1, column=3)
 
         self.task_type = StringVar(window)
-        type_choices = {'EXP', 'SxS', 'EXP PQ', 'Local', 'GSA', 'Image', 'YouTube'}
+        type_choices = {'EXP', 'SxS', 'EXP PQ', 'Local', 'GSA', 'Image', 'YouTube', 'U-O YouTube', 'U-O'}
         self.task_type.set('EXP')
         task_typeMenu = OptionMenu(window, self.task_type, *type_choices)
         Label(window, text="Task Type").grid(row=2, column=0)
@@ -45,7 +45,7 @@ class Window(object):
         self.task_minutes = StringVar(window)
         self.task_seconds = StringVar(window)
         time_choices = {'00', '01', '02', '03', '04', '05', '06', '07', '08', '09',
-             '10', '11', '12', '13', '14', '15'}
+             '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '21', '22'}
         sec_choices = {'00', '06', '12', '18', '24', '30', '36', '42', '48', '54'}
         self.task_minutes.set("01")
         self.task_seconds.set("00")
@@ -209,8 +209,9 @@ class Window(object):
 
     def update_db(self):
         if self.description_text != "":
+            duration = self.current_time - self.session_start
             database.insert(self.session_start.strftime("%Y-%m-%d %H:%M:%S") , self.current_time.strftime("%Y-%m-%d %H:%M:%S"),
-                self.description_text, self.session_duration, self.surplus )
+                self.description_text, str(duration)[:7], self.surplus )
             print("db updated")
 
     def update_description(self):
@@ -222,7 +223,7 @@ class Window(object):
         self.description_text = ""
         for key, value in self.description.items():
             self.description_text += str(value) + " " + key + ", "
-        self.tdescription.config(text = self.description_text)
+        #self.tdescription.config(text = self.description_text)
         print(self.description)
         self.sessioninfo.delete(0,END)
         for key, value in self.description.items():
@@ -250,12 +251,22 @@ class Window(object):
         rows = database.view_since(week_start.strftime("%Y-%m-%d") + " 00:00:00")
         total = timedelta(seconds=0)
         self.sessioninfo.delete(0,END)
+        days = []
+        current_day = week_start.strftime("%Y-%m-%d")
         for item in rows:
-            row = str(item[0]) + " " + item[1] + " " + item[2][-8:] + " " + item[4] + " " + str(item[5])
-            duration =  datetime.strptime(item[4], "%H:%M:%S")
-            total = total + timedelta(hours=duration.hour, minutes=duration.minute, seconds=duration.second)
-            self.sessioninfo.insert(END, row)
-        print( "total: " + str(total) )
+            current_row_date = item[1][0:10]
+            if (current_row_date == current_day):
+                duration =  datetime.strptime(item[4], "%H:%M:%S")
+                total = total + timedelta(hours=duration.hour, minutes=duration.minute, seconds=duration.second)
+            else:
+                if (total > timedelta(seconds=0) ):
+                    day_data = current_day + " " + str(total)
+                    self.sessioninfo.insert(END, day_data)
+                    current_day =  current_row_date
+                    duration =  datetime.strptime(item[4], "%H:%M:%S")
+                    total = timedelta(hours=duration.hour, minutes=duration.minute, seconds=duration.second)
+        day_data = rows[-1][1][0:10] + " " + str(total)
+        self.sessioninfo.insert(END, day_data)
 
     def today(self):
         today = datetime.now().strftime("%Y-%m-%d") + " 00:00:00"
@@ -291,12 +302,13 @@ class Window(object):
         today = datetime.now()
         period_start=datetime.strptime("2018-04-01", "%Y-%m-%d")
         total = timedelta(seconds=0)
-        while period_start <= today <= period_start + timedelta(days=14):
+        while period_start + timedelta(days=14) <= today:
             period_start = period_start + timedelta(days=14)
+        print(period_start + timedelta(days=14));
         rows = database.view_since(period_start)
         self.sessioninfo.delete(0,END)
         for item in rows:
-            row = item[1] + " " + item[2][-8:] + " " + item[4]
+            row = str(item[0]) + " " + item[1] + " " + item[2][-8:] + " " + item[4]
             duration =  datetime.strptime(item[4], "%H:%M:%S")
             total = total + timedelta(hours=duration.hour, minutes=duration.minute, seconds=duration.second)
             self.sessioninfo.insert(END, row)
