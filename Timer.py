@@ -250,14 +250,15 @@ class Window(object):
         week_start = datetime.now() - timedelta( days=( datetime.isoweekday( datetime.now() ) % 7 ) )
         rows = database.view_since(week_start.strftime("%Y-%m-%d") + " 00:00:00")
         total = timedelta(seconds=0)
+        week_total = timedelta(seconds=0)
         self.sessioninfo.delete(0,END)
-        days = []
         current_day = week_start.strftime("%Y-%m-%d")
         for item in rows:
             current_row_date = item[1][0:10]
             if (current_row_date == current_day):
                 duration =  datetime.strptime(item[4], "%H:%M:%S")
                 total = total + timedelta(hours=duration.hour, minutes=duration.minute, seconds=duration.second)
+                week_total +=  timedelta(hours=duration.hour, minutes=duration.minute, seconds=duration.second)
             else:
                 if (total > timedelta(seconds=0) ):
                     day_data = current_day + " " + str(total)
@@ -265,8 +266,11 @@ class Window(object):
                     current_day =  current_row_date
                     duration =  datetime.strptime(item[4], "%H:%M:%S")
                     total = timedelta(hours=duration.hour, minutes=duration.minute, seconds=duration.second)
+                    week_total +=  timedelta(hours=duration.hour, minutes=duration.minute, seconds=duration.second)
         day_data = rows[-1][1][0:10] + " " + str(total)
+        week_info = "Week total: " + str(week_total)
         self.sessioninfo.insert(END, day_data)
+        self.sessioninfo.insert(END, week_info)
 
     def today(self):
         today = datetime.now().strftime("%Y-%m-%d") + " 00:00:00"
@@ -292,7 +296,7 @@ class Window(object):
         self.sessioninfo.delete(0,END)
         total = timedelta(seconds=0)
         for item in rows:
-            row = item[1] + " " + item[2][-8:] + " " + item[4]
+            row = str(item[0]) + " " + item[1] + " " + item[2][-8:] + " " + item[4]
             duration =  datetime.strptime(item[4], "%H:%M:%S")
             total = total + timedelta(hours=duration.hour, minutes=duration.minute, seconds=duration.second)
             self.sessioninfo.insert(END, row)
@@ -304,14 +308,37 @@ class Window(object):
         total = timedelta(seconds=0)
         while period_start + timedelta(days=14) <= today:
             period_start = period_start + timedelta(days=14)
-        print(period_start + timedelta(days=14));
-        rows = database.view_since(period_start)
+        print(period_start + timedelta(days=14))
+        rows = database.view_since(period_start.strftime("%Y-%m-%d") + " 00:00:00")
+        total = timedelta(seconds=0)
+        period_total = timedelta(seconds=0)
         self.sessioninfo.delete(0,END)
+        current_day = period_start.strftime("%Y-%m-%d")
         for item in rows:
-            row = str(item[0]) + " " + item[1] + " " + item[2][-8:] + " " + item[4]
-            duration =  datetime.strptime(item[4], "%H:%M:%S")
-            total = total + timedelta(hours=duration.hour, minutes=duration.minute, seconds=duration.second)
-            self.sessioninfo.insert(END, row)
+            current_row_date = item[1][0:10]
+            if (current_row_date == current_day):
+                duration =  datetime.strptime(item[4], "%H:%M:%S")
+                total = total + timedelta(hours=duration.hour, minutes=duration.minute, seconds=duration.second)
+                period_total +=  timedelta(hours=duration.hour, minutes=duration.minute, seconds=duration.second)
+            else:
+                if (total > timedelta(seconds=0) ):
+                    day_data = current_day + " " + str(total)
+                    self.sessioninfo.insert(END, day_data)
+                    current_day =  current_row_date
+                    duration =  datetime.strptime(item[4], "%H:%M:%S")
+                    total = timedelta(hours=duration.hour, minutes=duration.minute, seconds=duration.second)
+                    period_total +=  timedelta(hours=duration.hour, minutes=duration.minute, seconds=duration.second)
+        day_data = rows[-1][1][0:10] + " " + str(total)
+        period_info = "Period total: " + str(period_total)
+        self.sessioninfo.insert(END, day_data)
+        self.sessioninfo.insert(END, period_info)
+        # rows = database.view_since(period_start)
+        # self.sessioninfo.delete(0,END)
+        # for item in rows:
+        #     row = str(item[0]) + " " + item[1] + " " + item[2][-8:] + " " + item[4]
+        #     duration =  datetime.strptime(item[4], "%H:%M:%S")
+        #     total = total + timedelta(hours=duration.hour, minutes=duration.minute, seconds=duration.second)
+        #     self.sessioninfo.insert(END, row)
         print( "total: " + str(total) )
 
 
