@@ -115,6 +115,9 @@ class Window(object):
         bclose=Button(window, text="Close", command=self.start)
         bclose.grid(row=10, column=3)
 
+        bprevperiod=Button(window, text="Prev Period", command=self.prev_period)
+        bprevperiod.grid(row=6, column=4)
+
     def start(self):
         self.timer_run = True
         self.timer_time = self.task_duration
@@ -341,6 +344,50 @@ class Window(object):
         #     self.sessioninfo.insert(END, row)
         print( "total: " + str(total) )
 
+
+
+
+    def prev_period(self):
+        today = datetime.now()
+        period_start=datetime.strptime("2018-04-01", "%Y-%m-%d")
+        total = timedelta(seconds=0)
+        while period_start + timedelta(days=14) <= today - timedelta(days=14):
+            period_start = period_start + timedelta(days=14)
+        print(period_start + timedelta(days=14))
+        rows = database.view_since(period_start.strftime("%Y-%m-%d") + " 00:00:00")
+        total = timedelta(seconds=0)
+        period_total = timedelta(seconds=0)
+        self.sessioninfo.delete(0,END)
+        current_day = period_start.strftime("%Y-%m-%d")
+        print(current_day)
+        for item in rows:
+            current_row_date = item[1][0:10]
+            if (current_row_date == current_day):
+                duration =  datetime.strptime(item[4], "%H:%M:%S")
+                total = total + timedelta(hours=duration.hour, minutes=duration.minute, seconds=duration.second)
+                period_total +=  timedelta(hours=duration.hour, minutes=duration.minute, seconds=duration.second)
+            else:
+                if (total > timedelta(seconds=0) ):
+                    day_data = current_day + " " + str(total)
+                    self.sessioninfo.insert(END, day_data)
+                    current_day =  current_row_date
+                    duration =  datetime.strptime(item[4], "%H:%M:%S")
+                    total = timedelta(hours=duration.hour, minutes=duration.minute, seconds=duration.second)
+                    period_total +=  timedelta(hours=duration.hour, minutes=duration.minute, seconds=duration.second)
+        day_data = rows[-1][1][0:10] + " " + str(total)
+        period_info = "Period total: " + str(period_total)
+        self.sessioninfo.insert(END, day_data)
+        self.sessioninfo.insert(END, period_info)
+        # rows = database.view_since(period_start)
+        # self.sessioninfo.delete(0,END)
+        # for item in rows:
+        #     row = str(item[0]) + " " + item[1] + " " + item[2][-8:] + " " + item[4]
+        #     duration =  datetime.strptime(item[4], "%H:%M:%S")
+        #     total = total + timedelta(hours=duration.hour, minutes=duration.minute, seconds=duration.second)
+        #     self.sessioninfo.insert(END, row)
+        print( "total: " + str(total) )
+
+        print("previous period")
 
 window=Tk()
 Window(window)
