@@ -251,6 +251,7 @@ class Window(object):
 
     def week(self):
         week_start = datetime.now() - timedelta( days=( datetime.isoweekday( datetime.now() ) % 7 ) )
+        print(week_start)
         rows = database.view_since(week_start.strftime("%Y-%m-%d") + " 00:00:00")
         total = timedelta(seconds=0)
         week_total = timedelta(seconds=0)
@@ -258,12 +259,13 @@ class Window(object):
         current_day = week_start.strftime("%Y-%m-%d")
         for item in rows:
             current_row_date = item[1][0:10]
+            print(current_row_date)
             if (current_row_date == current_day):
                 duration =  datetime.strptime(item[4], "%H:%M:%S")
                 total = total + timedelta(hours=duration.hour, minutes=duration.minute, seconds=duration.second)
                 week_total +=  timedelta(hours=duration.hour, minutes=duration.minute, seconds=duration.second)
             else:
-                if (total > timedelta(seconds=0) ):
+                if (total >= timedelta(seconds=0) ):
                     day_data = current_day + " " + str(total)
                     self.sessioninfo.insert(END, day_data)
                     current_day =  current_row_date
